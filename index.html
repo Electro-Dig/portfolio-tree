@@ -25,7 +25,7 @@
         const mode = (m && m[1]) || (/^(map|tree)$/.test(saved) ? saved : null) || (((window.CONTENT || {}).site || {}).mode === "tree" ? "tree" : "map");
         document.documentElement.dataset.theme = mode; window.__MODE = mode; }
     </script>
-    <link rel="stylesheet" href="assets/themes.css" />
+    <link rel="stylesheet" href="assets/themes.css?v=2" />
     <style>
       @font-face { font-family: "Smiley"; src: url("assets/fonts/SmileySans-Oblique.woff2") format("woff2"); font-display: swap; }
       * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -155,7 +155,7 @@
       <label class="opt"><input type="radio" name="vmode" value="off" /> 不播放，只显示封面</label>
     </div>
     <audio id="music" preload="auto"></audio>
-    <script>document.write(`<script src="assets/engine/${window.__MODE}.js"><\/script>`);</script>
-    <script src="assets/engine/site.js"></script>
+    <script>document.write(`<script src="assets/engine/${window.__MODE}.js?v=2"><\/script>`);</script>
+    <script src="assets/engine/site.js?v=2"></script>
   </body>
 </html>
