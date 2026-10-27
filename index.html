@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh" data-theme="sketch">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>Portfolio Tree</title>
+    <script>
+      window.__SITE = true; window.__EXPLORE = true;
+      // ?tick: drive frames with a timer (for hidden preview panes, where requestAnimationFrame is paused)
+      if (/[?&]tick/.test(location.search)) window.requestAnimationFrame = cb => setTimeout(() => cb(performance.now()), 33);
+      // ?cover / ?cover=title / ?cover=title-v: a still for a cover image — no UI, canvases at device resolution
+      if (/[?&]cover/.test(location.search)) { window.__DPR = window.devicePixelRatio || 1; document.documentElement.classList.add("cover");
+        if (/cover=title/.test(location.search)) document.documentElement.classList.add("cover-title");
+        if (/cover=title-v/.test(location.search)) document.documentElement.classList.add("cover-v"); }
+    </script>
+    <script>
+      // ?content=NAME loads content-NAME/ instead of content/ (e.g. a private content folder kept out of the repo)
+      { const m = /[?&]content=([\w-]+)/.exec(location.search), dir = m ? "content-" + m[1] : "content";
+        document.write(`<script src="${dir}/content.js"><\/script><script src="${dir}/media.js"><\/script>`); }
+    </script>
+    <script>
+      // visual style: ?theme=NAME, else content site.theme, else "sketch"
+      { const m = /[?&]theme=([\w-]+)/.exec(location.search), th = (m && m[1]) || ((window.CONTENT || {}).site || {}).theme || "sketch";
+        document.documentElement.dataset.theme = th; window.__THEME = th; }
+    </script>
+    <link rel="stylesheet" href="assets/themes.css" />
+    <style>
+      @font-face { font-family: "Smiley"; src: url("assets/fonts/SmileySans-Oblique.woff2") format("woff2"); font-display: swap; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: var(--paper); touch-action: none; font-family: var(--f); color: var(--ink); }
+      #root { position: fixed; inset: 0; overflow: hidden; background: var(--paper); cursor: grab; user-select: none; -webkit-user-select: none; }
+      #root.dragging { cursor: grabbing; }
+      #dots { position: absolute; inset: -200px; will-change: transform; background: var(--grain); pointer-events: none; }
+      canvas.layer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+      #world { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+      .card { position: absolute; background: var(--card); border: var(--card-border); box-shadow: var(--card-shadow); opacity: 0; transform-origin: 50% 50%; cursor: zoom-in; transition: box-shadow .15s; }
+      .card.tF { border-width: var(--card-border-f); }
+      .card:hover { box-shadow: 0 0 0 8px var(--hover), var(--card-shadow); }
+      .card .ph { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--ph); }
+      .card img, .card video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+      .card .tape { position: absolute; width: 120px; height: 32px; top: -15px; left: 50%; margin-left: -60px; background: var(--tape); transform: rotate(-4deg); }
+      .card.tP .tape { width: 80px; height: 24px; margin-left: -40px; top: -11px; }
+      .card.round { border-radius: 50%; padding: 0; overflow: hidden; }
+      .card.round .ph { border-radius: 50%; }
+      .card.isv::after { content: "▶"; position: absolute; right: 18px; bottom: 18px; width: 64px; height: 64px; border-radius: 50%; background: rgba(42,38,35,.62); color: #fff;
+        font-size: 28px; line-height: 64px; text-align: center; padding-left: 5px; pointer-events: none; transition: opacity .2s; }
+      .card.isv.tP::after { width: 46px; height: 46px; line-height: 46px; font-size: 20px; right: 12px; bottom: 12px; }
+      .card.isv.live::after { opacity: 0; }
+      .card.canplay::before { content: var(--canplay-text); position: absolute; left: -10px; top: -22px; z-index: 2; padding: 2px 14px; border-radius: 16px; background: var(--play); color: #fff;
+        font-family: var(--f); font-size: 26px; line-height: 38px; transform: rotate(-6deg); pointer-events: none; }
+      .card.canplay.tP::before { font-size: 20px; line-height: 30px; padding: 1px 10px; top: -18px; }
+      .lbl { position: absolute; white-space: nowrap; opacity: 0; transform-origin: 0 0; pointer-events: none; font-family: var(--f-hand); }
+      .lbl .tt { font-size: 66px; line-height: 80px; } .lbl .tt.N { font-size: 50px; line-height: 64px; } .lbl .tt.P { font-size: 38px; line-height: 48px; }
+      .lbl .dt { font-size: 32px; line-height: 80px; color: var(--mute); margin-left: 14px; } .lbl .dt.N { font-size: 28px; line-height: 64px; } .lbl .dt.P { font-size: 24px; line-height: 48px; }
+      .lbl .dt.ev { margin-left: 0; margin-right: 12px; color: var(--accent); font-size: 34px; line-height: 64px; } .lbl .tt.ev { font-size: 50px; line-height: 64px; }
+      .lbl .sub-l { font-size: 64px; line-height: 76px; }
+      .lbl .nt { font-size: 44px; line-height: 58px; color: var(--ink); } .lbl .nt.N { font-size: 36px; line-height: 48px; color: var(--ink-soft); }
+      .branch { position: absolute; white-space: nowrap; font-family: var(--f-hand); font-size: 128px; line-height: 150px; opacity: 0; pointer-events: none; }
+      .stamp { position: absolute; white-space: nowrap; padding: 6px 22px; border: 5px solid var(--stamp); border-radius: 40px; color: var(--stamp); pointer-events: none;
+        font-family: var(--f-hand); font-size: 42px; line-height: 52px; opacity: 0; transform-origin: 50% 50%; background: var(--paper); }
+      .stamp.small { font-size: 30px; line-height: 38px; border-width: 4px; padding: 4px 16px; }
+      #veil { position: absolute; inset: 0; opacity: 0; z-index: 5; pointer-events: none; background: var(--veil); }
+      #title, #end { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 6; pointer-events: none; padding: 0 16px; }
+      #title div, #end div { opacity: 0; }
+      #title .t1 { font-size: clamp(40px, 7.8vw, 150px); line-height: 1.18; } #title .t2 { font-size: clamp(18px, 2.9vw, 56px); color: var(--ink-soft); margin-top: 12px; }
+      #end .e0 { width: clamp(20px, 2.4vw, 46px); height: clamp(20px, 2.4vw, 46px); border-radius: 50%; background: var(--fruit); margin-bottom: 1.6vw; }
+      #end .e1 { font-size: clamp(32px, 6.4vw, 124px); line-height: 1.2; } #end .e2 { font-size: clamp(16px, 2.6vw, 50px); color: var(--ink-soft); margin-top: 1vw; }
+      #bar { position: fixed; left: 16px; right: 16px; top: 14px; display: flex; align-items: center; gap: 12px; z-index: 20; pointer-events: none; }
+      #bar .name { font-size: clamp(16px, 2.2vw, 30px); white-space: nowrap; background: var(--paper-a); padding: 4px 14px; border-radius: 10px; pointer-events: auto; }
+      #bar .sp { flex: 1; }
+      #bar button, #nav button { pointer-events: auto; font-family: var(--f); white-space: nowrap; cursor: pointer; }
+      #bar button { font-size: clamp(14px, 1.5vw, 20px); color: var(--ink); background: var(--card); border: 2px solid var(--ink); border-radius: 22px; padding: 8px 18px; box-shadow: var(--btn-shadow); }
+      #bar button:hover, #bar button.on { background: var(--hover); }
+      #nav { position: fixed; left: 16px; top: 64px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; z-index: 20; }
+      #nav button { font-size: clamp(14px, 1.4vw, 19px); text-align: left; background: var(--paper-a); border: 2px solid currentColor; border-radius: 18px; padding: 5px 14px; }
+      #nav button small { color: var(--mute); margin-left: 6px; font-size: .8em; }
+      #hint { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); font-size: 15px; color: var(--mute); z-index: 20; background: var(--paper-a); padding: 4px 12px; border-radius: 10px; pointer-events: none; white-space: nowrap; }
+      #set { position: fixed; right: 16px; top: 70px; width: min(360px, calc(100vw - 32px)); z-index: 25; display: none; flex-direction: column; gap: 8px;
+        background: var(--card); border: 2px solid var(--ink); border-radius: 14px; padding: 16px 18px; box-shadow: var(--btn-shadow); font-size: 18px; }
+      #set.on { display: flex; }
+      #set h3 { font-weight: normal; font-size: 22px; margin-bottom: 2px; }
+      #set .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } #set small { color: var(--mute); font-size: 14px; } #set .opt { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+      #set input[type=range] { width: 100%; accent-color: var(--accent); } #set input[type=checkbox], #set input[type=radio] { accent-color: var(--accent); width: 18px; height: 18px; }
+      #box { position: fixed; inset: 0; z-index: 30; background: rgba(42,38,35,.55); display: none; align-items: center; justify-content: center; padding: 3vh 3vw; }
+      #box.on { display: flex; }
+      #box .panel { background: var(--card); border: 3px solid var(--ink); border-radius: 12px; padding: 18px; max-width: 92vw; max-height: 92vh; display: flex; flex-direction: column; gap: 12px; }
+      #box .media { max-width: 88vw; max-height: 70vh; display: block; margin: 0 auto; background: #000; }
+      #box .tt { font-size: clamp(24px, 3vw, 44px); } #box .dt { font-size: 18px; color: var(--mute); margin-left: 10px; } #box .nt { font-size: clamp(18px, 2vw, 28px); }
+      #box .x, #film .x { position: absolute; right: 22px; top: 16px; font: 28px var(--f); color: #fff; cursor: pointer; }
+      #box .acts { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+      #box .acts a { font-family: var(--f); font-size: 18px; color: var(--ink); border: 2px solid var(--ink); border-radius: 18px; padding: 6px 16px; text-decoration: none; background: var(--card); }
+      #box .acts a.play { background: var(--play); color: #fff; border-color: var(--play); } #box .acts a.go { background: var(--link); }
+      #wall { position: fixed; inset: 0; z-index: 28; background: var(--paper-a); display: none; flex-direction: column; }
+      #wall.on { display: flex; }
+      #wall .head { display: flex; align-items: baseline; gap: 14px; padding: 18px 24px 8px; }
+      #wall .head h2 { font-weight: normal; font-size: clamp(26px, 3vw, 44px); } #wall .head small { color: var(--mute); font-size: clamp(14px, 1.3vw, 18px); }
+      #wall .head .x { margin-left: auto; font-size: 28px; cursor: pointer; padding: 0 8px; }
+      #wall .grid { flex: 1; overflow-y: auto; padding: 16px 24px 24px; display: grid; gap: 22px 18px; align-content: center; touch-action: pan-y; }
+      #wall .po { background: var(--card); border: var(--card-border); padding: 8px 8px 10px; box-shadow: var(--card-shadow); cursor: zoom-in; position: relative; min-width: 0; }
+      #wall .po:nth-child(3n+1) { transform: rotate(-1.2deg); } #wall .po:nth-child(3n+2) { transform: rotate(.9deg); }
+      #wall .po:hover { box-shadow: 0 0 0 6px var(--hover), var(--card-shadow); }
+      #wall .po img { width: 100%; aspect-ratio: 3 / 4; object-fit: contain; background: var(--ph); display: block; }
+      #wall .po .tp { position: absolute; width: 90px; height: 26px; top: -12px; left: 50%; margin-left: -45px; background: var(--tape); transform: rotate(-4deg); }
+      #wall .po .cap { font-size: 15px; line-height: 1.3; margin-top: 6px; height: 3.9em; overflow: hidden; } #wall .po .cap small { display: block; color: var(--accent); font-size: 15px; }
+      #film { position: fixed; inset: 0; z-index: 29; background: rgba(42,38,35,.92); display: none; align-items: center; justify-content: center; }
+      #film.on { display: flex; }
+      #film video { width: min(96vw, calc(92vh * 16 / 9)); aspect-ratio: 16 / 9; background: #000; border-radius: 6px; }
+      @media (max-width: 640px) { #nav { top: auto; bottom: 12px; left: 8px; right: 8px; flex-direction: row; overflow-x: auto; } #hint { display: none; } }
+      /* covers */
+      html.cover #bar, html.cover #nav, html.cover #hint, html.cover #set { display: none !important; }
+      #ctitle { display: none; position: fixed; right: 4.5%; top: 5.5%; z-index: 30; pointer-events: none; text-align: right; }
+      html.cover-title #ctitle { display: block; }
+      #ctitle .a { font-size: 4.9vw; line-height: 1.18; } #ctitle .b { font-size: 1.75vw; color: var(--ink-soft); margin-top: 1.1vw; }
+      html.cover-v #ctitle { right: auto; left: 0; width: 100%; top: auto; bottom: 6.5%; text-align: center; }
+      html.cover-v #ctitle .a { font-size: 7.2vw; white-space: nowrap; } html.cover-v #ctitle .a br { display: none; } html.cover-v #ctitle .a .l2 { margin-left: .45em; }
+      html.cover-v #ctitle .b { font-size: 3.2vw; margin-top: 1.6vw; }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="dots"></div>
+      <canvas id="ink" class="layer"></canvas>
+      <div id="world"></div>
+      <div id="veil"></div>
+      <div id="title"><div class="t1"></div><div class="t2"></div></div>
+      <div id="end"><div class="e0"></div><div class="e1"></div><div class="e2"></div></div>
+    </div>
+    <div id="bar"><span class="name"></span><span class="sp"></span><button id="all"></button><button id="play"></button><button id="wallbtn"></button><button id="fit"></button><button id="gear" title="设置">⚙</button></div>
+    <div id="hint"></div>
+    <div id="box"><div class="x">✕</div><div class="panel"><div class="m"></div><div><span class="tt"></span><span class="dt"></span></div><div class="nt"></div><div class="acts"></div></div></div>
+    <div id="wall"><div class="head"><h2></h2><small></small><span class="x">✕</span></div><div class="grid"></div></div>
+    <div id="nav"></div>
+    <div id="ctitle"><div class="a"></div><div class="b"></div></div>
+    <div id="film"><span class="x">✕</span><video controls playsinline preload="none"></video></div>
+    <div id="set">
+      <h3>播放设置</h3>
+      <label class="row needs-music"><input type="checkbox" id="s-bg" /> 背景音乐</label>
+      <input type="range" id="s-bgvol" class="needs-music" min="0" max="1" step="0.05" />
+      <label class="row"><input type="checkbox" id="s-voice" /> 重点作品原声 <small>（经过重点作品时播放它自己的声音）</small></label>
+      <input type="range" id="s-voicevol" min="0" max="1" step="0.05" />
+      <div class="row">镜头远近 <b id="s-zoomv"></b> <small>（播放时也可用滚轮 / 双指调）</small></div>
+      <input type="range" id="s-zoom" min="0.5" max="2.5" step="0.05" />
+      <div class="row">视频播放</div>
+      <label class="opt"><input type="radio" name="vmode" value="center" /> 只播画面中心的几个（最流畅）</label>
+      <label class="opt"><input type="radio" name="vmode" value="all" /> 屏幕内全部播放</label>
+      <label class="opt"><input type="radio" name="vmode" value="off" /> 不播放，只显示封面</label>
+    </div>
+    <audio id="music" preload="auto"></audio>
+    <script src="assets/engine/tree.js"></script>
+    <script src="assets/engine/site.js"></script>
+  </body>
+</html>

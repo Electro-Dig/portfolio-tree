@@ -1,0 +1,5 @@
+content-private/
+covers/
+docs/covers-demo/
+node_modules/
+*.log
