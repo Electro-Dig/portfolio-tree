@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh" data-theme="sketch">
+<html lang="zh" data-theme="map">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
@@ -19,9 +19,11 @@
         document.write(`<script src="${dir}/content.js"><\/script><script src="${dir}/media.js"><\/script>`); }
     </script>
     <script>
-      // visual style: ?theme=NAME, else content site.theme, else "sketch"
-      { const m = /[?&]theme=([\w-]+)/.exec(location.search), th = (m && m[1]) || ((window.CONTENT || {}).site || {}).theme || "sketch";
-        document.documentElement.dataset.theme = th; window.__THEME = th; }
+      // layout mode: "map" (growth map, default) or "tree". ?mode=NAME, else the one picked last time in this browser, else
+      // content site.mode. Each mode has its own engine and look.
+      { const m = /[?&]mode=(map|tree)\b/.exec(location.search); let saved = null; try { saved = localStorage.getItem("portfolioTreeMode"); } catch (e) {}
+        const mode = (m && m[1]) || (/^(map|tree)$/.test(saved) ? saved : null) || (((window.CONTENT || {}).site || {}).mode === "tree" ? "tree" : "map");
+        document.documentElement.dataset.theme = mode; window.__MODE = mode; }
     </script>
     <link rel="stylesheet" href="assets/themes.css" />
     <style>
@@ -71,6 +73,10 @@
       #bar button, #nav button { pointer-events: auto; font-family: var(--f); white-space: nowrap; cursor: pointer; }
       #bar button { font-size: clamp(14px, 1.5vw, 20px); color: var(--ink); background: var(--card); border: 2px solid var(--ink); border-radius: 22px; padding: 8px 18px; box-shadow: var(--btn-shadow); }
       #bar button:hover, #bar button.on { background: var(--hover); }
+      #modes { display: flex; pointer-events: auto; }
+      #modes button { border-radius: 0; box-shadow: none; padding: 6px 14px; }
+      #modes button:first-child { border-radius: 22px 0 0 22px; } #modes button:last-child { border-radius: 0 22px 22px 0; border-left: 0; }
+      #modes button.on { background: var(--ink); color: var(--card); }
       #nav { position: fixed; left: 16px; top: 64px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; z-index: 20; }
       #nav button { font-size: clamp(14px, 1.4vw, 19px); text-align: left; background: var(--paper-a); border: 2px solid currentColor; border-radius: 18px; padding: 5px 14px; }
       #nav button small { color: var(--mute); margin-left: 6px; font-size: .8em; }
@@ -107,10 +113,13 @@
       #film video { width: min(96vw, calc(92vh * 16 / 9)); aspect-ratio: 16 / 9; background: #000; border-radius: 6px; }
       @media (max-width: 640px) { #nav { top: auto; bottom: 12px; left: 8px; right: 8px; flex-direction: row; overflow-x: auto; } #hint { display: none; } }
       /* covers */
+      @media (max-width: 640px) { #modes button { padding: 5px 9px; } }
       html.cover #bar, html.cover #nav, html.cover #hint, html.cover #set { display: none !important; }
       #ctitle { display: none; position: fixed; right: 4.5%; top: 5.5%; z-index: 30; pointer-events: none; text-align: right; }
       html.cover-title #ctitle { display: block; }
       #ctitle .a { font-size: 4.9vw; line-height: 1.18; } #ctitle .b { font-size: 1.75vw; color: var(--ink-soft); margin-top: 1.1vw; }
+      html[data-theme="map"].cover-title:not(.cover-v) #ctitle { top: auto; bottom: 4.5%; right: 3%; }   /* the growth map's timeline fills the top */
+      html[data-theme="map"].cover-title:not(.cover-v) #ctitle .a { font-size: 4.2vw; }
       html.cover-v #ctitle { right: auto; left: 0; width: 100%; top: auto; bottom: 6.5%; text-align: center; }
       html.cover-v #ctitle .a { font-size: 7.2vw; white-space: nowrap; } html.cover-v #ctitle .a br { display: none; } html.cover-v #ctitle .a .l2 { margin-left: .45em; }
       html.cover-v #ctitle .b { font-size: 3.2vw; margin-top: 1.6vw; }
@@ -125,7 +134,7 @@
       <div id="title"><div class="t1"></div><div class="t2"></div></div>
       <div id="end"><div class="e0"></div><div class="e1"></div><div class="e2"></div></div>
     </div>
-    <div id="bar"><span class="name"></span><span class="sp"></span><button id="all"></button><button id="play"></button><button id="wallbtn"></button><button id="fit"></button><button id="gear" title="设置">⚙</button></div>
+    <div id="bar"><span class="name"></span><span id="modes"><button data-mode="map">生长图</button><button data-mode="tree">树形</button></span><span class="sp"></span><button id="all"></button><button id="play"></button><button id="wallbtn"></button><button id="fit"></button><button id="gear" title="设置">⚙</button></div>
     <div id="hint"></div>
     <div id="box"><div class="x">✕</div><div class="panel"><div class="m"></div><div><span class="tt"></span><span class="dt"></span></div><div class="nt"></div><div class="acts"></div></div></div>
     <div id="wall"><div class="head"><h2></h2><small></small><span class="x">✕</span></div><div class="grid"></div></div>
@@ -146,7 +155,7 @@
       <label class="opt"><input type="radio" name="vmode" value="off" /> 不播放，只显示封面</label>
     </div>
     <audio id="music" preload="auto"></audio>
-    <script src="assets/engine/tree.js"></script>
+    <script>document.write(`<script src="assets/engine/${window.__MODE}.js"><\/script>`);</script>
     <script src="assets/engine/site.js"></script>
   </body>
 </html>

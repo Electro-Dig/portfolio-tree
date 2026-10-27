@@ -16,7 +16,7 @@ window.CONTENT = {
     subtitle: "2024.01–2025.06 个人项目汇总",
     coverTitle: ["一颗种子", "长成一棵树"],       // the cover title, one entry per line
     start: "2024.01", end: "2025.06",
-    theme: "sketch",                           // visual style: "sketch" or "crayon" (try ?theme=crayon)
+    mode: "map",                               // layout shown first: "map" (growth map) or "tree"; visitors can switch
     duration: 120,                             // length of the growth animation, seconds
     music: null,                               // optional: "content/music.mp3" — plays with the growth animation
     film: null,                                // optional: a pre-rendered video of the animation, e.g. "content/film.mp4"
@@ -26,6 +26,8 @@ window.CONTENT = {
   seed: { title: "第一个作品", date: "2024.01", media: "seed.jpg", note: "一切从这里开始" },
 
   // big branches (fields) → groups (sub-branches, themes) → items (works)
+  // Optional per branch: color (growth map), treeColor (tree), angle (growth map: direction in degrees, 0 = right, clockwise).
+  // The growth map reads a branch's groups as one line in time order; the tree draws each group as its own sub-branch.
   branches: [
     { label: "声音实验", from: "2024.02", groups: [
       { label: "合成器小玩具", items: [

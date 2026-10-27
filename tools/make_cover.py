@@ -1,7 +1,7 @@
 """Make cover images of your tree with headless Chrome: landscape 4:3 and portrait 3:4, with and without the title.
 
     python tools/make_cover.py                    # → covers/*.png
-    python tools/make_cover.py --theme crayon     # in another visual style
+    python tools/make_cover.py --mode tree        # the tree layout instead of the growth map
     python tools/make_cover.py --content private  # from content-private/ instead of content/
 
 Chrome is looked up in the usual places; set CHROME=/path/to/chrome if it is somewhere else.
@@ -31,14 +31,14 @@ def shot(url, size, out):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--theme", default=None)
+    ap.add_argument("--mode", default=None, choices=["map", "tree"])
     ap.add_argument("--content", default=None)
     ap.add_argument("--out", default=str(ROOT / "covers"))
     a = ap.parse_args()
     a.out = os.path.abspath(a.out); os.makedirs(a.out, exist_ok=True)   # Chrome needs an absolute screenshot path
     base = (ROOT / "index.html").as_uri()
-    extra = "".join(f"&{k}={v}" for k, v in (("theme", a.theme), ("content", a.content)) if v)
-    tag = f"_{a.theme}" if a.theme else ""
+    extra = "".join(f"&{k}={v}" for k, v in (("mode", a.mode), ("content", a.content)) if v)
+    tag = f"_{a.mode}" if a.mode else ""
     shot(f"{base}?cover=title{extra}", "1600,1200", os.path.join(a.out, f"cover_4x3_title{tag}.png"))
     shot(f"{base}?cover{extra}", "1600,1200", os.path.join(a.out, f"cover_4x3{tag}.png"))
     shot(f"{base}?cover=title-v{extra}", "1200,1600", os.path.join(a.out, f"cover_3x4_title{tag}.png"))

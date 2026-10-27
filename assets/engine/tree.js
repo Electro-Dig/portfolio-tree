@@ -20,15 +20,11 @@
   function lastBefore(arr, t) { let lo = 0, hi = arr.length - 1, r = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (arr[m] <= t) { r = m; lo = m + 1; } else hi = m - 1; } return r; }
   const pulse = t => { if (!BEATS) return 0; const i = lastBefore(BEATS, t); return i < 0 ? 0 : Math.exp(-(t - BEATS[i]) / 0.12); };
   const hash = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
-  const mixHex = (a, b, u) => { const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16), ch = (n, k) => (n >> k) & 255;
-    return "#" + [16, 8, 0].map(k => Math.round(ch(A, k) + (ch(B, k) - ch(A, k)) * u).toString(16).padStart(2, "0")).join(""); };
   const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
-  // visual style (assets/themes.css + how limbs are drawn): "sketch" = ink ribbons, "crayon" = coloured-pencil hatching + leaves
-  const THEME = window.__THEME || SITECFG.theme || "sketch", CRAYON = THEME === "crayon";
-  const INK = CRAYON ? "#3b4a44" : "#2a2623", BARK = SITECFG.barkColor || (CRAYON ? "#c69a6b" : "#5b4636");
-  const FRUIT_C = SITECFG.fruitColor || (CRAYON ? "#d9573b" : "#c2541f");
-  const PAL = CRAYON ? ["#d6b04a", "#c69a6b", "#d9573b", "#8fae8b", "#7e93b8"] : ["#F2B42C", "#E8743B", "#E9627E", "#3DA37A", "#2F6FB0"];
-  const GREENS = CRAYON ? ["#2f5d50", "#8fae8b", "#7e93b8", "#d6b04a", "#5f7f6a", "#b5a36a"] : ["#23704f", "#6b8e23", "#22777c", "#4e6b2a", "#3f8f5f", "#7a8f2a"];
+  const INK = "#2a2623", BARK = SITECFG.barkColor || "#5b4636", FRUIT_C = SITECFG.fruitColor || "#c2541f";
+  const PAL = ["#F2B42C", "#E8743B", "#E9627E", "#3DA37A", "#2F6FB0"];
+  // the tree has its own greens; a branch's `treeColor` (or `color`) overrides them
+  const GREENS = ["#23704f", "#6b8e23", "#22777c", "#4e6b2a", "#3f8f5f", "#7a8f2a"];
   const MDIR = (C.mediaDir || "content/media/").replace(/\/?$/, "/");
   const info = f => MEDIA[f] || {};
   const ar = f => { const m = info(f); return m.w && m.h ? m.w / m.h : 16 / 9; };
@@ -96,9 +92,9 @@
     });
     const tip = [P0[0] + u[0] * (along - 260), P0[1] + u[1] * (along - 260)];
     const label = tb.label || "", lp = [P0[0] + u[0] * 300, P0[1] + u[1] * 300 - 160], llw = label.length * 120;
-    return { id: tb.id || "b" + bi, m0, label, color: tb.color || GREENS[bi % GREENS.length], side, ang, u, P0, tip, groups, lp, llw, n: groups.reduce((s, g) => s + g.n, 0) };
+    return { id: tb.id || "b" + bi, m0, label, color: tb.treeColor || GREENS[bi % GREENS.length], side, ang, u, P0, tip, groups, lp, llw, n: groups.reduce((s, g) => s + g.n, 0) };
   });
-  BR.forEach(b => (b.text = CRAYON ? mixHex(b.color, "#1f2a26", 0.38) : b.color));
+  BR.forEach(b => (b.text = b.color));
   BR.forEach(b => { lineBoxes(b.P0, b.tip, 90);
     BOXES.push(b.side > 0 ? [b.lp[0] + 30, b.lp[1] - 10, b.lp[0] + 50 + b.llw, b.lp[1] + 150] : [b.lp[0] - 50 - b.llw, b.lp[1] - 10, b.lp[0] - 30, b.lp[1] + 150]);
     b.groups.forEach(g => { lineBoxes(g.S0, [g.S0[0] + g.gu[0] * 260, g.S0[1] + g.gu[1] * 260], 70);
@@ -237,51 +233,15 @@
     for (let i = 1; i < W.length - 2; i++) { const [p0, p1, p2, p3] = [W[i - 1], W[i], W[i + 1], W[i + 2]];
       for (let k = 0; k < n; k++) { const u = k / n, u2 = u * u, u3 = u2 * u; o.push([0, 1].map(j => 0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * u + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * u2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * u3))); } }
     o.push(P[P.length - 1]); return o; }
-  // ---- coloured pencil: a hatched, grainy texture per colour (cached), darker double edges, leaves ----
-  const hex = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
-  const mix = (a, b, u) => { const A = hex(a), B = hex(b); return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * u).toString(16).padStart(2, "0")).join(""); };
-  const PATS = {};
-  function pencil(ctx, col) {
-    if (PATS[col]) return PATS[col];
-    const S2 = 120, o = document.createElement("canvas"); o.width = o.height = S2; const g = o.getContext("2d");
-    g.fillStyle = col; g.globalAlpha = 0.58; g.fillRect(0, 0, S2, S2);
-    g.strokeStyle = col; g.lineCap = "round";
-    for (let i = 0; i < 70; i++) { const x = hash(i * 3.1 + 7) * S2 * 1.4 - S2 * 0.2, y = hash(i * 5.7 + 3) * S2 * 1.4 - S2 * 0.2, L = 18 + 30 * hash(i * 9.3);
-      g.globalAlpha = 0.45 + 0.45 * hash(i * 2.2); g.lineWidth = 1.8 + 2.4 * hash(i * 4.4);
-      for (const dx of [-S2, 0, S2]) for (const dy of [-S2, 0, S2]) { g.beginPath(); g.moveTo(x + dx, y + dy); g.lineTo(x + dx + L, y + dy - L * 0.9); g.stroke(); } }
-    g.fillStyle = "#fffdf6";
-    for (let i = 0; i < 520; i++) { g.globalAlpha = 0.25 + 0.5 * hash(i * 1.37 + 11); const r = 0.5 + 1.3 * hash(i * 7.77); g.beginPath(); g.arc(hash(i * 3.33 + 1) * S2, hash(i * 6.66 + 2) * S2, r, 0, 7); g.fill(); }
-    return (PATS[col] = ctx.createPattern(o, "repeat"));
-  }
-  function crayonLimb(ctx, L, R, col, c, seed) {
-    ctx.save(); ctx.fillStyle = pencil(ctx, col); ctx.globalAlpha = 0.95; ctx.beginPath(); L.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
-    for (let i = R.length - 1; i >= 0; i--) ctx.lineTo(R[i][0], R[i][1]); ctx.closePath(); ctx.fill();
-    // two passes of a thin, darker, slightly broken pencil edge, offset from each other
-    const edge = mix(col, "#1f2a26", 0.45), lw = Math.max(1.1, 1.3 / c.z * Math.min(1, c.z * 1.4));
-    ctx.strokeStyle = edge; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = lw;
-    for (let pass = 0; pass < 2; pass++) { ctx.globalAlpha = pass ? 0.4 : 0.8; ctx.setLineDash([120 + 60 * hash(seed + pass), 14 + 10 * hash(seed * 3 + pass)]);
-      for (const side of [L, R]) { ctx.beginPath(); side.forEach((p, i) => { const ox = pass * 3 * Math.sin(i + seed), oy = pass * 3 * Math.cos(i * 1.3 + seed); i ? ctx.lineTo(p[0] + ox, p[1] + oy) : ctx.moveTo(p[0] + ox, p[1] + oy); }); ctx.stroke(); } }
-    ctx.restore();
-  }
-  function leaf(ctx, x, y, ang, len, col, prog, c, seed) {
-    if (prog <= 0) return; const l = len * E.back(clamp(prog)), w = l * 0.42, ca = Math.cos(ang), sa = Math.sin(ang);
-    const P = (u, v) => [x + ca * u - sa * v, y + sa * u + ca * v];
-    ctx.save(); ctx.beginPath(); const a = P(0, 0), b = P(l, 0), c1 = P(l * 0.35, -w), c2 = P(l * 0.75, -w * 0.8), c3 = P(l * 0.75, w * 0.8), c4 = P(l * 0.35, w);
-    ctx.moveTo(a[0], a[1]); ctx.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], b[0], b[1]); ctx.bezierCurveTo(c3[0], c3[1], c4[0], c4[1], a[0], a[1]);
-    ctx.fillStyle = pencil(ctx, col); ctx.globalAlpha = 0.95; ctx.fill();
-    ctx.strokeStyle = mix(col, "#1f2a26", 0.45); ctx.globalAlpha = 0.7; ctx.lineWidth = Math.max(1, 1.1 / c.z * Math.min(1, c.z * 1.4)); ctx.stroke();
-    const m0 = P(l * 0.08, 0), m1 = P(l * 0.85, 0); ctx.beginPath(); ctx.moveTo(m0[0], m0[1]); ctx.lineTo(m1[0], m1[1]); ctx.globalAlpha = 0.45; ctx.stroke(); ctx.restore();
-  }
-  // a hand-drawn tapered limb: a filled ribbon from width w0 to w1, jittered at 6 fps, plus a thin ink edge (crayon: pencil texture)
+  // a hand-drawn tapered limb: a filled ribbon from width w0 to w1, jittered at 6 fps, plus a thin ink edge
   function limb(ctx, pts, prog, col, w0, w1, c, t, seed = 0) {
     if (prog <= 0 || pts.length < 2) return;
     const n = Math.max(2, Math.ceil((pts.length - 1) * prog) + 1), b = boil(t), j = 1.2 / c.z, L = [], R = [];
     for (let i = 0; i < n; i++) { const p = pts[Math.min(i, pts.length - 1)], q = pts[Math.min(i + 1, pts.length - 1)], o = pts[Math.max(i - 1, 0)];
       let dx = q[0] - o[0], dy = q[1] - o[1]; const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
-      const u = i / (pts.length - 1), w = lerp(w0, w1, u) / 2 * (1 + 0.08 * Math.sin(i * 1.7 + seed)) * (CRAYON ? 1.35 : 1);   // pencil reads lighter, so a little wider
+      const u = i / (pts.length - 1), w = lerp(w0, w1, u) / 2 * (1 + 0.08 * Math.sin(i * 1.7 + seed));
       const jx = (hash(i * 3 + b * 17 + seed) - 0.5) * 2 * j, jy = (hash(i * 5 + b * 13 + seed) - 0.5) * 2 * j;
       L.push([p[0] - dy * w + jx, p[1] + dx * w + jy]); R.push([p[0] + dy * w + jx, p[1] - dx * w + jy]); }
-    if (CRAYON) return crayonLimb(ctx, L, R, col, c, seed);
     ctx.save(); ctx.fillStyle = col; ctx.beginPath(); L.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])));
     for (let i = R.length - 1; i >= 0; i--) ctx.lineTo(R[i][0], R[i][1]); ctx.closePath(); ctx.fill();
     ctx.globalAlpha = 0.55; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.2, 1.6 / c.z * Math.min(1, c.z * 1.4)); ctx.stroke(); ctx.restore();
@@ -294,10 +254,7 @@
       g.items.forEach(it => { const dx = it.C[0] - it.P[0], dy = it.C[1] - it.P[1], L = Math.hypot(dx, dy) || 1;
         const edge = Math.min(it.W / 2 / Math.abs(dx / L || 1e-6), (it.H / 2 + 16) / Math.abs(dy / L || 1e-6)); it.twig = curvePts(it.P, [it.C[0] - dx / L * edge, it.C[1] - dy / L * edge], 0.12, 10); }); });
     b.wBase = 16 + 4.2 * Math.sqrt(b.n) * 2;
-    // leaves: every few samples along a sub-branch, alternating sides, leaning toward the tip; they open as the twig grows
-    if (CRAYON) b.groups.forEach((g, gi) => { g.leaves = [];
-      for (let i = 6; i < g.limb.length - 1; i += 5) { const p = g.limb[i], q = g.limb[i + 1], a = Math.atan2(q[1] - p[1], q[0] - p[0]), sd = (i / 5) % 2 ? 1 : -1, hh = hash(i * 13 + gi * 7 + b.n);
-        g.leaves.push({ x: p[0], y: p[1], ang: a + sd * (0.7 + 0.35 * hh), len: 70 + 60 * hh, col: hh < 0.18 ? "#d6b04a" : hh < 0.55 ? "#8fae8b" : hh < 0.8 ? "#5f8f6a" : "#2f5d50", f: i / (g.limb.length - 1) }); } }); });
+  });
   const coverVis = t => (t < SEC.rewind[0] ? 1 : 1 - ramp(t, SEC.rewind[0], SEC.rewind[0] + 1.6, "in"));
   function vis(t0, t) { if (EXPLORE) return 1; if (t < SEC.rewind[1]) return coverVis(t); return ramp(t, t0 - 0.1, t0 + 0.3, "out"); }
   const sty = (el, k, v) => { const m = el._sty || (el._sty = {}); if (m[k] !== v) { m[k] = v; el.style[k] = v; } };
@@ -320,10 +277,7 @@
     const pr = (a, d) => (full ? cv : ramp(t, a, a + d));
     // ground, roots
     { const g = full ? cv : ramp(t, tSeed - 1, tSeed + 0.6);
-      if (g > 0) { ink.save(); ink.globalAlpha = (CRAYON ? 0.35 : 0.5) * g; ink.strokeStyle = INK; ink.lineWidth = 3 / Math.max(0.3, c.z); ink.beginPath(); ink.moveTo(-1400 * g, 150); for (let x = -1400; x <= 1400; x += 80) ink.lineTo(x * g, 150 + 8 * Math.sin(x / 90)); ink.stroke(); ink.restore();
-        if (CRAYON) for (let k = 0; k < 16; k++) { const gx = (-1250 + k * 170 + 60 * hash(k)) * g; if (Math.abs(gx) < 200) continue;
-          for (let j = 0; j < 5; j++) { const a = -Math.PI / 2 + (j - 2) * 0.32 + 0.2 * hash(k * 5 + j), L = 40 + 50 * hash(k * 7 + j);
-            ink.save(); ink.strokeStyle = j % 2 ? "#8fae8b" : "#5f8f6a"; ink.globalAlpha = 0.8 * g; ink.lineWidth = 5; ink.lineCap = "round"; ink.beginPath(); ink.moveTo(gx + j * 6, 150); ink.quadraticCurveTo(gx + j * 6 + Math.cos(a) * L * 0.4, 150 + Math.sin(a) * L * 0.6, gx + j * 6 + Math.cos(a) * L, 150 + Math.sin(a) * L); ink.stroke(); ink.restore(); } }
+      if (g > 0) { ink.save(); ink.globalAlpha = 0.5 * g; ink.strokeStyle = INK; ink.lineWidth = 3 / Math.max(0.3, c.z); ink.beginPath(); ink.moveTo(-1400 * g, 150); for (let x = -1400; x <= 1400; x += 80) ink.lineTo(x * g, 150 + 8 * Math.sin(x / 90)); ink.stroke(); ink.restore();
         ROOTS.forEach((r, i) => limb(ink, r, g, BARK, 22 - i * 3, 3, c, t, 70 + i)); } }
     // trunk: grows with time
     const tp = full ? cv : trunkP(t);
@@ -333,16 +287,13 @@
       limb(ink, b.limb, pr(b.t0, b.dur), b.color, b.wBase, Math.max(8, b.wBase * 0.35), c, t, 20 + bi);
       b.groups.forEach((g, gi) => { const w = 6 + 2.6 * Math.sqrt(g.n) * 2;
         limb(ink, g.limb, full ? cv : g.prog(t), b.color, w, 3.5, c, t, 40 + bi * 10 + gi);
-        g.items.forEach((it, k) => { const p = full ? cv : ramp(t, it.tPop - 0.35, it.tPop); if (p > 0) limb(ink, it.twig, p, b.color, 4.5, 2, c, t, 90 + k); });
-        if (g.leaves) { const gp = full ? cv : g.prog(t); g.leaves.forEach((lf, li) => leaf(ink, lf.x, lf.y, lf.ang, lf.len, lf.col, full ? cv : clamp((gp - lf.f) * 6), c, li)); } });
+        g.items.forEach((it, k) => { const p = full ? cv : ramp(t, it.tPop - 0.35, it.tPop); if (p > 0) limb(ink, it.twig, p, b.color, 4.5, 2, c, t, 90 + k); }); });
     });
     // fruit stems + the fruit
     FRUIT.forEach((f, i) => { const p = full ? cv : ramp(t, f.tPop - 0.4, f.tPop); if (p <= 0) return;
       limb(ink, curvePts(f.stem[0], f.stem[1], 0.15 * f.side, 12), p, FRUIT_C, 6, 2.5, c, t, 200 + i);
-      const fx = f.stem[0][0] + f.side * 26, fy = f.stem[0][1] + 18, fr = (CRAYON ? 20 : 13) * p * (1 + 0.15 * pulse(t));
-      ink.fillStyle = CRAYON ? pencil(ink, FRUIT_C) : "#d9483b"; ink.beginPath(); ink.arc(fx, fy, fr, 0, 7); ink.fill();
-      if (CRAYON) { ink.save(); ink.strokeStyle = mix(FRUIT_C, "#1f2a26", 0.4); ink.lineWidth = 2; ink.globalAlpha = 0.7; ink.stroke();
-        ink.strokeStyle = "#fffdf6"; ink.globalAlpha = 0.9; ink.lineWidth = 4; ink.beginPath(); ink.arc(fx - fr * 0.25, fy - fr * 0.25, fr * 0.45, Math.PI * 1.05, Math.PI * 1.55); ink.stroke(); ink.restore(); } });
+      const fx = f.stem[0][0] + f.side * 26, fy = f.stem[0][1] + 18, fr = 13 * p * (1 + 0.15 * pulse(t));
+      ink.fillStyle = "#d9483b"; ink.beginPath(); ink.arc(fx, fy, fr, 0, 7); ink.fill(); });
     // a ring of colour around the seed
     if (SEED.media) { const sp = full ? cv : ramp(t, tSeed + 0.2, tSeed + 0.8);
       if (sp > 0) for (let i = 0; i < 48; i++) { const a = -Math.PI / 2 + i * Math.PI / 24, h = (10 + 34 * hash(i) * (0.4 + 0.6 * pulse(t))) * sp;

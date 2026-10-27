@@ -5,7 +5,7 @@
 //   ?view=x,y,z      start at this camera position          ?at=SEC       freeze the growth animation at that second
 //   ?cover           hide the UI (for screenshots)          ?cover=title  … and show the cover title (landscape)
 //   ?cover=title-v   portrait cover title                   ?wall         open the poster wall
-//   ?theme=NAME      try a visual style ("sketch", "crayon")  ?tick       drive frames with a timer (hidden preview panes)
+//   ?mode=map|tree   growth map (default) or tree layout    ?tick         drive frames with a timer (hidden preview panes)
 (function () {
   const C = window.CONTENT || {}, SITECFG = C.site || {}, UI = Object.assign({
     play: "▶ 流动观看", stop: "■ 停止", film: "▶ 播放视频", wall: "海报墙", fit: "全图", count: n => `${n} 个项目`,
@@ -28,6 +28,12 @@
   const lines = SITECFG.coverTitle || [SITECFG.title || ""];
   document.querySelector("#ctitle .a").innerHTML = lines.map((l, i) => `<span class="l${i + 1}">${esc(l)}</span>`).join("<br>");
   document.querySelector("#ctitle .b").textContent = SITECFG.subtitle || range;
+
+  // ---------- layout mode switch (the page reloads with the other engine; the choice is remembered) ----------
+  document.querySelectorAll("#modes button").forEach(b => { b.classList.toggle("on", b.dataset.mode === window.__MODE);
+    b.onclick = () => { if (b.dataset.mode === window.__MODE) return; try { localStorage.setItem("portfolioTreeMode", b.dataset.mode); } catch (e) {}
+      const q = location.search.replace(/[?&](mode|view|at)=[^&]*/g, "").replace(/^&/, "?");
+      location.search = (q && q !== "?" ? q + "&" : "?") + "mode=" + b.dataset.mode; }; });
 
   // ---------- canvas + camera ----------
   const cvs = [...document.querySelectorAll("canvas.layer")];
